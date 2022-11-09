@@ -2,20 +2,28 @@ import fetch from "node-fetch";
 import {ZKLib} from "./libs/node-zklib/zklib.js";
 import {COMMANDS} from "./libs/node-zklib/constants.js";
 
-const environment = {
-    'api': 'https://hr2.port.mv',
-    'api_key': "1234567890",
-}
+import * as dotenv from 'dotenv';
+
+dotenv.config();
+
+const api = process.env.API_URL;
+const api_key = process.env.API_KEY;
+
+const environment = {api, api_key};
 
 const headers = {
-    'Content-Type': 'application/json',
-    'Authorization': environment.api_key
+    'Content-Type': 'application/json', 'Authorization': environment.api_key
 }
 
 let readerList = [];
 const fetchReaderListMinutes = 5;
 
 const main = async () => {
+    if (!environment.api || !environment.api_key) {
+        console.error('API or API_KEY not set');
+        return;
+    }
+
     await loadReaders();
 
     setInterval(async () => {
@@ -38,6 +46,7 @@ const main = async () => {
             console.log(e)
             if (e.code === 'EADDRINUSE') {
             }
+            continue;
         }
 
         // Get users in machine
@@ -48,7 +57,10 @@ const main = async () => {
         // Get all logs in the machine
         // Currently, there is no filter to take data, it just takes all !!
         const logs = await zkInstance.getAttendances();
-        await postRecords(logs.data);
+        const posted = await postRecords(logs.data);
+        if (!posted) {
+            continue;
+        }
 
         if (commands.restart) {
             await zkInstance.executeCmd(COMMANDS.CMD_RESTART, '');
@@ -61,19 +73,18 @@ const main = async () => {
         // YOu can also read realtime log by getRealTimelogs function
 
         // console.log('check users', users)
-        //
-        console.log("Listening for realtime events");
-        await zkInstance.getRealTimeLogs((data) => {
-            postRecords(data);
-            console.log(data);
-        });
-
 
         // delete the data in machine
         // You should do this when there are too many data in the machine, this issue can slow down machine
         if (commands.clear_attendance) {
             await zkInstance.clearAttendanceLog();
         }
+
+        console.log("Listening for realtime events");
+        await zkInstance.getRealTimeLogs((data) => {
+            postRecords([data]);
+            console.log(data);
+        });
 
         // Get the device time
         // console.log(zkInstance);
@@ -87,22 +98,30 @@ const main = async () => {
 }
 
 const loadReaders = async () => {
-    console.log('Fetching readers');
-    const res = await fetch(environment.api + '/api/readers/active', {method: 'GET', headers});
-    const data = await res.json();
-    console.log(data);
-    readerList = data.data;
+    try {
+        console.log('Fetching readers');
+        const res = await fetch(environment.api + '/api/readers/active', {method: 'GET', headers});
+        const data = await res.json();
+        readerList = data.data;
+        console.log('Fetched readers');
+    } catch (e) {
+        console.error(e, 'Error fetching readers: ' + (new Date()).toString());
+    }
 }
 
 const postRecords = async (records) => {
-    console.log({records});
-    const res = await fetch(environment.api + '/api/sync_attendance', {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(records)
-    });
-    const data = await res.json();
-    console.log(data);
+    try {
+        console.log('Posting records to server: ', records);
+        const res = await fetch(environment.api + '/api/sync_attendance', {
+            method: 'POST', headers, body: JSON.stringify(records)
+        });
+        const data = await res.json();
+        console.log(data);
+        return true;
+    } catch (e) {
+        console.error(e, 'Error posting records to server: ' + (new Date()).toString());
+        return false;
+    }
 }
 
 main();
