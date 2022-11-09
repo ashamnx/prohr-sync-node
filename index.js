@@ -20,7 +20,7 @@ const fetchReaderListMinutes = 5;
 
 const main = async () => {
     if (!environment.api || !environment.api_key) {
-        console.error('API or API_KEY not set');
+        console.error('API_URL or API_KEY not set');
         return;
     }
 
