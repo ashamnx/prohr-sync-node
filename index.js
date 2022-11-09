@@ -43,9 +43,11 @@ const main = async () => {
             console.log('device', await zkInstance.getInfo());
 
         } catch (e) {
-            console.log(e)
-            if (e.code === 'EADDRINUSE') {
+            // console.log(e)
+            if (e.code === 'E' +
+                'ADDRINUSE') {
             }
+            console.error(e, `Error connecting to reader: ${IP}, ${name}` + (new Date()).toString());
             continue;
         }
 
