@@ -71,6 +71,7 @@ const main = async () => {
         // })
 
         // YOu can also read realtime log by getRealTimelogs function
+        listenToReader(zkInstance, {IP, name}).then(() => {});
 
         // console.log('check users', users)
 
@@ -80,11 +81,6 @@ const main = async () => {
             await zkInstance.clearAttendanceLog();
         }
 
-        console.log("Listening for realtime events");
-        await zkInstance.getRealTimeLogs((data) => {
-            postRecords([data]);
-            console.log(data);
-        });
 
         // Get the device time
         // console.log(zkInstance);
@@ -103,7 +99,7 @@ const loadReaders = async () => {
         const res = await fetch(environment.api + '/api/readers/active', {method: 'GET', headers});
         const data = await res.json();
         readerList = data.data;
-        console.log('Fetched readers');
+        console.log(`Fetched readers: ${readerList.length}`);
     } catch (e) {
         console.error(e, 'Error fetching readers: ' + (new Date()).toString());
     }
@@ -111,16 +107,27 @@ const loadReaders = async () => {
 
 const postRecords = async (records) => {
     try {
-        console.log('Posting records to server: ', records);
+        console.log('Posting records to server: ' + records.length);
         const res = await fetch(environment.api + '/api/sync_attendance', {
             method: 'POST', headers, body: JSON.stringify(records)
         });
-        const data = await res.json();
-        console.log(data);
+        await res.json();
         return true;
     } catch (e) {
         console.error(e, 'Error posting records to server: ' + (new Date()).toString());
         return false;
+    }
+}
+
+const listenToReader = async (zkInstance, {IP, name}) => {
+    console.log(`Listening for realtime events on ${IP}: (${name})`);
+    try {
+        await zkInstance.getRealTimeLogs((data) => {
+            postRecords([data]);
+            console.log(data);
+        });
+    } catch (e) {
+        console.error(e, 'Error listening to reader: ' + (new Date()).toString());
     }
 }
 
